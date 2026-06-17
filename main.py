@@ -111,6 +111,16 @@ async def add_monitor(req: MonitorRequest):
     await check_api_status(new_monitor) # Run instant first check
     return new_monitor
 
+@app.post("/api/monitors/{monitor_id}/ping")
+async def force_ping_monitor(monitor_id: str):
+    for m in monitors:
+        if m['id'] == monitor_id:
+            if not m['is_active']:
+                raise HTTPException(status_code=400, detail="Cannot ping a suspended channel")
+            await check_api_status(m)
+            return m
+    raise HTTPException(status_code=404, detail="Monitor not found")
+
 @app.post("/api/monitors/{monitor_id}/toggle")
 async def toggle_monitor(monitor_id: str):
     for m in monitors:
@@ -192,7 +202,7 @@ async def serve_ui():
                         <input type="text" id="mon-name" placeholder="e.g. Free Fire API Bot" class="w-full bg-black/50 border border-gray-800 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400 text-sm">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-cyan-500/70 mb-1 uppercase">Target Target Endpoint (URL)</label>
+                        <label class="block text-xs font-bold text-cyan-500/70 mb-1 uppercase">Target Endpoint (URL)</label>
                         <input type="url" id="mon-url" placeholder="https://like-api.onrender.com" class="w-full bg-black/50 border border-gray-800 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400 text-sm">
                     </div>
                 </div>
@@ -211,6 +221,16 @@ async def serve_ui():
                 </button>
             </div>
 
+            <div class="flex flex-col sm:flex-row gap-3 items-center justify-between bg-gray-950/40 border border-gray-900 p-4 rounded-xl mb-6">
+                <div class="w-full sm:w-72 relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-gray-600 text-xs"></i>
+                    <input type="text" id="search-bar" oninput="searchMatrix()" placeholder="Filter matrix by identity/url..." class="w-full bg-black border border-gray-800 rounded-lg pl-9 pr-4 py-2 text-xs focus:outline-none focus:border-cyan-500 text-gray-300">
+                </div>
+                <button onclick="downloadBackup()" class="w-full sm:w-auto px-4 py-2 bg-cyan-950/30 border border-cyan-900/50 hover:bg-cyan-900/40 text-cyan-400 font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 transition-all">
+                    <i class="fa-solid fa-cloud-arrow-down"></i> Export Logs Database
+                </button>
+            </div>
+
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-black text-gray-300 flex items-center gap-2"><i class="fa-solid fa-network-wired text-cyan-400"></i> Active Core Matrices</h2>
                 <span class="text-xs bg-cyan-900/40 text-cyan-400 border border-cyan-800 px-3 py-1 rounded-full font-bold">Auto-Sync Active (10s)</span>
@@ -225,6 +245,8 @@ async def serve_ui():
         </div>
 
         <script>
+            let currentCachedMonitors = [];
+
             // Particle system background matrix loop
             particlesJS('particles-js', {
                 "particles": {
@@ -249,52 +271,65 @@ async def serve_ui():
                     document.getElementById('stat-checks').innerText = stats.total_checks;
 
                     const listRes = await fetch('/api/monitors');
-                    const monitors = await listRes.json();
-                    const container = document.getElementById('monitors-grid');
-                    container.innerHTML = '';
-
-                    if(monitors.length === 0) {
-                        container.innerHTML = `<div class="vip-card p-8 rounded-xl text-center text-sm text-gray-500 tracking-wide">No internal target nodes deployed inside runtime network.</div>`;
-                        return;
-                    }
-
-                    monitors.forEach(m => {
-                        let badgeColor = "bg-yellow-500/10 text-yellow-400 border-yellow-500/30";
-                        if(m.status === 'UP') badgeColor = "bg-green-500/10 text-green-400 border-green-500/30";
-                        if(m.status === 'DOWN') badgeColor = "bg-red-500/10 text-red-500/30 border-red-500/40";
-                        if(m.status === 'STOPPED') badgeColor = "bg-gray-800 text-gray-500 border-gray-700";
-
-                        const card = document.createElement('div');
-                        card.className = `vip-card p-5 rounded-xl border-l-4 shadow-md transition-all duration-300 ${m.status === 'UP' ? 'border-l-green-500' : m.status === 'DOWN' ? 'border-l-red-500' : 'border-l-gray-600'}`;
-                        
-                        card.innerHTML = `
-                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                                <div>
-                                    <h3 class="text-md font-extrabold text-white tracking-wide flex items-center gap-2">${m.name} <span class="text-xs font-mono text-gray-600">[HTTP: ${m.status_code}]</span></h3>
-                                    <p class="text-xs font-mono text-cyan-600/80 mt-0.5 break-all">${m.url}</p>
-                                </div>
-                                <span class="px-3 py-1 font-mono text-xs font-black rounded-md border self-start sm:self-center ${badgeColor}">${m.status}</span>
-                            </div>
-
-                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-black/30 p-3 rounded-lg text-xs font-mono text-gray-400 mb-4">
-                                <div class="flex items-center gap-1.5"><i class="fa-solid fa-gauge-high text-cyan-400"></i> <span>Pulse: <b class="text-white">${m.response_time}ms</b></span></div>
-                                <div class="flex items-center gap-1.5"><i class="fa-solid fa-shield-heart text-green-400"></i> <span>Uptime: <b class="text-white">${m.uptime}%</b></span></div>
-                                <div class="flex items-center gap-1.5"><i class="fa-solid fa-rotate text-yellow-500"></i> <span>Checks: <b class="text-white">${m.success_checks}/${m.total_checks}</b></span></div>
-                                <div class="flex items-center gap-1.5"><i class="fa-solid fa-hourglass-start text-blue-400"></i> <span>Loop: <b class="text-white">${m.interval}m</b></span></div>
-                            </div>
-
-                            <div class="flex items-center gap-3">
-                                <button onclick="toggleChannel('${m.id}')" class="px-4 py-1.5 bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all">
-                                    <i class="fa-solid fa-${m.is_active ? 'pause text-amber-500' : 'play text-green-500'}"></i> ${m.is_active ? 'Suspend' : 'Resume'}
-                                </button>
-                                <button onclick="destroyChannel('${m.id}')" class="px-4 py-1.5 bg-red-950/40 border border-red-900/30 hover:bg-red-900/50 text-red-400 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all">
-                                    <i class="fa-solid fa-trash-can"></i> Terminate
-                                </button>
-                            </div>
-                        `;
-                        container.appendChild(card);
-                    });
+                    currentCachedMonitors = await listRes.json();
+                    renderMatrixGrid(currentCachedMonitors);
                 } catch (err) { console.error("Sync Error: ", err); }
+            }
+
+            function renderMatrixGrid(dataList) {
+                const container = document.getElementById('monitors-grid');
+                container.innerHTML = '';
+
+                if(dataList.length === 0) {
+                    container.innerHTML = `<div class="vip-card p-8 rounded-xl text-center text-sm text-gray-500 tracking-wide">No internal target nodes match inside runtime network.</div>`;
+                    return;
+                }
+
+                dataList.forEach(m => {
+                    let badgeColor = "bg-yellow-500/10 text-yellow-400 border-yellow-500/30";
+                    if(m.status === 'UP') badgeColor = "bg-green-500/10 text-green-400 border-green-500/30";
+                    if(m.status === 'DOWN') badgeColor = "bg-red-500/10 text-red-500/30 border-red-500/40";
+                    if(m.status === 'STOPPED') badgeColor = "bg-gray-800 text-gray-500 border-gray-700";
+
+                    const card = document.createElement('div');
+                    card.className = `vip-card p-5 rounded-xl border-l-4 shadow-md transition-all duration-300 ${m.status === 'UP' ? 'border-l-green-500' : m.status === 'DOWN' ? 'border-l-red-500' : 'border-l-gray-600'}`;
+                    
+                    card.innerHTML = `
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                            <div>
+                                <h3 class="text-md font-extrabold text-white tracking-wide flex items-center gap-2">${m.name} <span class="text-xs font-mono text-gray-600">[HTTP: ${m.status_code}]</span></h3>
+                                <p class="text-xs font-mono text-cyan-600/80 mt-0.5 break-all">${m.url}</p>
+                            </div>
+                            <span class="px-3 py-1 font-mono text-xs font-black rounded-md border self-start sm:self-center ${badgeColor}">${m.status}</span>
+                        </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-black/30 p-3 rounded-lg text-xs font-mono text-gray-400 mb-4">
+                            <div class="flex items-center gap-1.5"><i class="fa-solid fa-gauge-high text-cyan-400"></i> <span>Pulse: <b class="text-white">${m.response_time}ms</b></span></div>
+                            <div class="flex items-center gap-1.5"><i class="fa-solid fa-shield-heart text-green-400"></i> <span>Uptime: <b class="text-white">${m.uptime}%</b></span></div>
+                            <div class="flex items-center gap-1.5"><i class="fa-solid fa-rotate text-yellow-500"></i> <span>Checks: <b class="text-white">${m.success_checks}/${m.total_checks}</b></span></div>
+                            <div class="flex items-center gap-1.5"><i class="fa-solid fa-hourglass-start text-blue-400"></i> <span>Loop: <b class="text-white">${m.interval}m</b></span></div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3">
+                            <button onclick="toggleChannel('${m.id}')" class="px-3 py-1.5 bg-gray-900 border border-gray-800 hover:border-gray-700 text-gray-300 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all">
+                                <i class="fa-solid fa-${m.is_active ? 'pause text-amber-500' : 'play text-green-500'}"></i> ${m.is_active ? 'Suspend' : 'Resume'}
+                            </button>
+                            <button onclick="forcePing('${m.id}')" ${!m.is_active ? 'disabled class="opacity-40 cursor-not-allowed px-3 py-1.5 bg-gray-900 border border-gray-800 text-gray-500 font-bold rounded-lg text-xs flex items-center gap-1.5"' : 'class="px-3 py-1.5 bg-cyan-900/20 border border-cyan-800/40 hover:bg-cyan-900/40 text-cyan-400 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all"'}>
+                                <i class="fa-solid fa-bolt-lightning"></i> Force Ping
+                            </button>
+                            <button onclick="destroyChannel('${m.id}')" class="px-3 py-1.5 bg-red-950/40 border border-red-900/30 hover:bg-red-900/50 text-red-400 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all ml-auto">
+                                <i class="fa-solid fa-trash-can"></i> Terminate
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+
+            function searchMatrix() {
+                const query = document.getElementById('search-bar').value.toLowerCase().trim();
+                const filtered = currentCachedMonitors.filter(m => m.name.toLowerCase().includes(query) || m.url.toLowerCase().includes(query));
+                renderMatrixGrid(filtered);
             }
 
             async function deployMonitor() {
@@ -315,6 +350,11 @@ async def serve_ui():
                 refreshDashboard();
             }
 
+            async function forcePing(id) {
+                await fetch(`/api/monitors/${id}/ping`, { method: 'POST' });
+                refreshDashboard();
+            }
+
             async function toggleChannel(id) {
                 await fetch(`/api/monitors/${id}/toggle`, { method: 'POST' });
                 refreshDashboard();
@@ -327,6 +367,17 @@ async def serve_ui():
                 }
             }
 
+            function downloadBackup() {
+                if(currentCachedMonitors.length === 0) return alert('No logs found to export!');
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentCachedMonitors, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", "vip_uptime_backup.json");
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+            }
+
             setInterval(refreshDashboard, 10000);
             window.onload = refreshDashboard;
         </script>
@@ -334,3 +385,10 @@ async def serve_ui():
     </html>
     """
     return HTMLResponse(content=html_content)
+
+# --- PRODUCTION RUNNER ENGINE (For Render / Koyeb Early Exit Fix) ---
+if __name__ == "__main__":
+    import uvicorn
+    # Automatically tracks host environment dynamic ports
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
