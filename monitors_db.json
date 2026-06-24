@@ -5,13 +5,13 @@
     "url": "https://uptime-lnr1.onrender.com/",
     "interval": 5,
     "status": "UP",
-    "response_time": 184,
+    "response_time": 813,
     "status_code": 200,
-    "uptime": 100,
-    "success_checks": 2,
-    "total_checks": 2,
+    "uptime": 98.11,
+    "success_checks": 52,
+    "total_checks": 53,
     "is_active": true,
-    "last_check": "2026-06-17 10:40:27"
+    "last_check": "2026-06-24 10:31:00"
   },
   {
     "id": "1781692877417",
@@ -19,13 +19,13 @@
     "url": "https://tiktok-download-bot.onrender.com/",
     "interval": 5,
     "status": "UP",
-    "response_time": 258,
+    "response_time": 728,
     "status_code": 200,
     "uptime": 100,
-    "success_checks": 2,
-    "total_checks": 2,
+    "success_checks": 53,
+    "total_checks": 53,
     "is_active": true,
-    "last_check": "2026-06-17 10:41:27"
+    "last_check": "2026-06-24 10:31:00"
   },
   {
     "id": "1781692957507",
@@ -33,12 +33,54 @@
     "url": "https://speedxtvlive.onrender.com/",
     "interval": 5,
     "status": "UP",
-    "response_time": 284,
+    "response_time": 429,
+    "status_code": 200,
+    "uptime": 100,
+    "success_checks": 53,
+    "total_checks": 53,
+    "is_active": true,
+    "last_check": "2026-06-24 10:31:00"
+  },
+  {
+    "id": "1782296893613",
+    "name": "Tamp mail🟢🧬",
+    "url": "https://tampmailve.onrender.com/",
+    "interval": 5,
+    "status": "DOWN",
+    "response_time": 239,
+    "status_code": 502,
+    "uptime": 0,
+    "success_checks": 0,
+    "total_checks": 2,
+    "is_active": true,
+    "last_check": "2026-06-24 10:28:19"
+  },
+  {
+    "id": "1782296990046",
+    "name": "Host wab🥰🌺",
+    "url": "https://hosting-bot-wnsy.onrender.com/",
+    "interval": 5,
+    "status": "UP",
+    "response_time": 182,
     "status_code": 200,
     "uptime": 100,
     "success_checks": 2,
     "total_checks": 2,
     "is_active": true,
-    "last_check": "2026-06-17 10:42:37"
+    "last_check": "2026-06-24 10:29:59"
+  },
+  {
+    "id": "1782297042319",
+    "name": "UPTIME V2🐵",
+    "url": "https://uptime-io.onrender.com/",
+    "interval": 5,
+    "status": "UP",
+    "response_time": 150,
+    "status_code": 200,
+    "uptime": 100,
+    "success_checks": 2,
+    "total_checks": 2,
+    "is_active": true,
+    "last_check": "2026-06-24 10:30:49"
   }
 ]
